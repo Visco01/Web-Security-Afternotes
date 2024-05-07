@@ -74,3 +74,85 @@ applications can modify this through the *Expires* attribute:
   session identifier by deleting the corresponding entries from the database.
 - *Client-Side State*: Include an expiration date as part of the encrypted data
   and implement a blacklist of session cookies issued to compromised accounts.
+
+* Same Origin Policy (SOP)
+The Same Origin Policy (SOP) is the baseline defense mechanism of web browsers,
+which isolates data controlled by good.com from read / write accesses by scripts
+served from evil.com.
+
+** Web Origins
+SOP defines its own isolation domains in terms of origins.
+
+#+begin_quote
+*Origin*: An origin is a triple including a scheme, a hostname and a port. When
+ the port is omitted, the default port of the scheme is implicitly assumed.
+#+end_quote
+
+#+begin_quote
+*SOP restrictions*: At a high level, SOP can be summarized as follows: data
+ owned by origin $o_{1}$ must be isolated from read / write accesses by any
+ origin $o_{2} \neq o_{1}$.
+#+end_quote
+
+** Cookies VS Web Storage
+
+| Cookies                          | Web Storage                        |
+| - Relaxed SOP (insicure)         | + Traditional SOP (more secure)    |
+| - Sent automatically (CSRF)      | + Sent on demand (no CSRF)         |
+| + HttpOnly: shielded from JS     | - Always accessible to JS (risky)  |
+| + Sessions are easy to implement | - Sessions require custom JS logic |
+
+*Cookies + Web Storage = Better sessions* against the Session hijacking, session
+fixation, CSRF.
+
+** SOP and content inclusion
+Since the Web is designed to be interconnected, *SOP puts very little
+restrictions* on content inclusion. For example, foo.com can normally load
+images and stylesheets from bar.com.
+
+#+begin_quote
+*Sub-Resource Integrity*: It is possible to enforce integrity checks on included
+ scripts, browsers fetching the remote script compare the hash in the integrity
+ tag with the hash computed from the downloaded script; if the two hashes do not
+ match, the script is not loaded. *Difficult to deploy*.
+#+end_quote
+
+** Cross-Origin-Resource-Sharing (CORS)
+CORS provides a disciplined way to relax the restrictions of SOP:
+1) foo.com asks for permission to read cross-origin data;
+2) bar.com grants or denies such permission;
+3) the browser enforces the authorization decision at foo.com;
+
+#+begin_quote
+*CORS headers*:
+- *Origin*: request header containing the origin which is asking for
+  cross-origin read permission;
+- *Access-Control-Allow-Origin*: response header containing the origin to which
+  such permission is granted (* for any origin).
+
+  Access is granted iff the content of the Access-Control-Allow-Origin header
+  matches the content of the Origin header.
+#+end_quote
+
+*** CORS: Non-Simple Requests
+#+begin_quote
+*CORS headers*:
+- *Access-Control-Request-Method*: preflight request header containing the
+  method of the non-simple request;
+- *Access-Control-Request-Headers*: preflight request header containing the list
+  of the custom headers of the non-simple request;
+- *Access-Control-Allow-Methods*: preflight response header containing a list of
+  allowed methods;
+- *Access-Control-Allow-Headers*: preflight response header containing a list of
+  allowed custom headers;
+- *Access-Control-Max-Age*: preflight response header for caching.
+#+end_quote
+
+*** Security of CORS
+CORS is a standardized, more secure alternative to JSONP:
+1) *No script injection*: though the callee can still respond with arbitrary
+   content, the caller can process the response (not a script) before actually
+   using it. This is normally done in the XHR callback.
+2) *No information leakage*: only credentialed requests might disclose
+   confidential information and the callee has control over them, thanks to the
+   Access-Control-Allow-Origin header.
