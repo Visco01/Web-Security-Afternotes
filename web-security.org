@@ -1,0 +1,76 @@
+#+title: Web Security
+
+* Web Sessions Security
+
+** Session Management
+1) *Server-side state*: Persist the state information on the server, e.g., in a
+   database, and use the cookie just to store a session identifier. The database
+   storing session information can become a bottleneck.
+2) *Client-side state*: Persist the state information directly into the cookie.
+   A secure implementation requires the use of cryptography, at least for
+   signing the cookie and possibly for encrypting it.
+
+** Attacks on sessions integrity
+
+*** Session hijacking
+An attacker who gets access to a honest user’s cookies can impersonate her by
+presenting such cookies: this attack is known as session hijacking.
+
+#+begin_quote
+*HTTP only cookie*: Cookies marked with the HttpOnly attribute are not
+ accessible to JS, thus offering confidentiality against web attackers.
+#+end_quote
+
+#+begin_quote
+*Secure cookies*: Cookies marked with the Secure attribute are only sent over
+ HTTPS and made inaccessible to JavaScript running in HTTP pages. The Secure
+ attribute should be used even when the web application is entirely deployed
+ over HTTPS.
+#+end_quote
+
+*** Session fixation
+Many web applications use *pre-sessions* (unauthenticated sessions) to keep
+track of state information even before login. For example, Most e-commerce
+applications allow users to add items to their shopping cart before login for
+usability reasons. The content of the cart is persisted upon login to enable
+payments. *Cookies storing session identifiers should be refreshed every time
+the privilege level of the session changes, e.g., upon login*. Otherwise, the
+web application might be vulnerable to *session fixation*.
+
+#+begin_quote
+*Session fixation through cookie*: This method explores the server response to
+ fix the Session ID in the victim’s browser. Including the parameter Set-Cookie
+ in the HTTP header response, the attacker is able to insert the value of
+ Session ID in the cookie and sends it to the victim’s browser.
+#+end_quote
+
+**** Preventing Session fixation
+1) *Refresh cookies upon authentication*: when the credentials are verified,
+   change the value of the cookie and start a new session;
+2) *Enforce cookie integrity*: ensure that the attacker cannot set cookies for
+   the target web application
+
+*** Cross-Site-Request-Forgery
+Since cookies are automatically attached to HTTP requests by default, an
+attacker can *force the creation of authenticated requests from the victim’s
+browser*, which might trigger security-sensitive actions (CSRF).
+
+Discussed below in detail.
+
+*** Cookie forcing
+Cookie forcing is not necessarily dangerous, but can be nasty. *Example*: Since
+paypal.com binds a credit card number to a personal account, an attacker can
+perform cookie forcing on paypal.com to eventually *get access to the credit
+card* number of the victim.
+
+** Session expiration
+Cookies are deleted by default when the web browser is closed, but web
+applications can modify this through the *Expires* attribute:
+- *long session lifetimes* improve usability, but might harm security;
+- make the *“Remember Me”* functionality an opt-in.
+
+*Implementation*:
+- *Server-Side State*: Expiration is simple to implement: just invalidate the
+  session identifier by deleting the corresponding entries from the database.
+- *Client-Side State*: Include an expiration date as part of the encrypted data
+  and implement a blacklist of session cookies issued to compromised accounts.
