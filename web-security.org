@@ -156,3 +156,139 @@ CORS is a standardized, more secure alternative to JSONP:
 2) *No information leakage*: only credentialed requests might disclose
    confidential information and the callee has control over them, thanks to the
    Access-Control-Allow-Origin header.
+
+* Cross-site scripting (XSS)
+Cross Site Scripting (XSS) is the king of client-side attacks, because it allows
+the attacker to inject scripts on a vulnerable web application: when a malicious
+script runs in the target’s origin, *SOP is ineffective*.
+
+*XSS flow*:
+1) the attacker identifies a part of the target web application which processes
+   *untrusted input from the user*, e.g., a search field;
+2) the attacker discovers that the supplied *input can be eventually interpreted
+   as a script*, e.g., using their own browser;
+3) the attacker sends a maliciously crafted link to the victim, who accesses it
+   and triggers a script injection;
+4) since the script actually comes from the target web application, it runs *in
+   the same origin of the target*.
+
+** XSS Categories
+#+begin_quote
+*Type flow*:
+- *Reflected XSS*: happens when web applications echo back untrusted user input
+  to the client.
+- *Persistent XSS*: happens when web applications store untrusted user input
+  somewhere and automatically echo it back later.
+#+end_quote
+
+#+begin_quote
+*Location of flow*:
+- *Server-side XSS*: vulnerable code on the server (“traditional” XSS)
+- *Client-side XSS*: vulnerable code on the client (DOM-based XSS)
+#+end_quote
+
+*** Categories summary
+| *Reflected server-side XSS*                               | *Reflected client-side XSS*                               | *Persistent server-side XSS*                   | *Persistent client-side* XSS                    |
+| User must visit malicious link                            | User must visit malicious link                            | Attacker can store malicious payload on server | User must visit malicious link, but just once   |
+| No persistent change to the server (one attack per visit) | No persistent change to the client (one attack per visit) | Every user of the site affected on every visit | Single user of the site affected on every visit |
+
+*** XSS Polyglot
+A polyglot is an exploit working in several different contexts:
+#+begin_src javascript
+javascript:alert()//"){}alert();//</a><script>alert()</script>
+#+end_src
+
+** XSS defenses
+| *Output encoding*                                   | *Input Sanitization*                                    |
+| Very easy to use                                    | Don’t do it by yourself!                                |
+| Solves the root cause of the security vulnerability | Some attacks like markup injection might still be there |
+| Sometimes restrictive                               | Sometimes necessary                                     |
+
+* Content Security Policy (CSP)
+CSP was born as an industrial effort to design a *declarative client-side defense*
+mechanism *against XSS* in 2010:
+- Now supported by all major web browsers;
+- Useful defense-in-depth (*mitigation*) approach against XSS: it does not
+  substitute input sanitization and output encoding;
+- No protection against scriptless attacks like HTML markup injection.
+
+A CSP is a *page-level security policy* delivered to the browser via the
+*Content-Security-Policy* header. The browser then takes care of enforcing the
+policy on the page.
+
+** CSP directives
+| *Directive* | *Applies to*                |
+| connect-src | Targets of XHRs             |
+| img-src     | Images and favicons         |
+| object-src  | Plugins (Flash, applets...) |
+| script-src  | JavaScript files            |
+| style-src   | CSS files                   |
+| default-src | Fallback directive          |
+
+** CSP default restrictions (script-src, default-src)
+*Script execution*:
+- No execution of inline scripts;
+- No execution of inline event handlers, e.g., onerror;
+- No execution of javascript: URLs.
+
+*String-to-code transformation*:
+- Invocation of the eval function is forbidden;
+- Functions like setTimeout must be invoked with a callable.
+
+** CSP Roadblocks
+1) *Whitelist*: The simplest way to build whitelists is to enforce a restrictive
+   CSP as report-only via the *Content-Security-Policy-Report-Only* header;
+2) *Inline Scripts and Friends*: CSP forbids inline scripts, event handlers and javascript, so one has to:
+   1) Move inline scripts to external files;
+   2) Replace event handlers with listeners registered by external scripts;
+   3) Replace javascript: URLs with script-initiated code.
+3) *String-to-Code Transformations*: Functions like eval and setTimeout can be used to transform strings into code, thus leading to injections.
+
+** CSP Nonces
+CSP can now be used to whitelist scripts (inline or external) bearing a *valid
+nonce*, i.e., a random, unpredictable string:
+#+begin_src html
+script-src  ’self’ https://example.com ’nonce-54321’;
+default-src ’self’
+#+end_src
+
+Individual inline scripts can be whitelisted using the nonce attribute (the same nonce can be used for many inline scripts):
+#+begin_src html
+<script nonce="54321"> alert(1); </script>
+#+end_src
+
+*Nonces advantages*:
+- They provide support for inline scripts, without falling back to the complete
+  absence of security of ’unsafe-inline’;
+- They whitelist individual scripts as opposed to entire origins, which
+  simplifies the security auditing
+
+#+begin_quote
+The developer is in charge of generating random, unpredictable nonces on each
+incoming request and populating the CSP header correctly: *Nonce reuse can
+easily break protection against XSS*.
+#+end_quote
+
+** Supporting dynamic scripts
+Make use of the *’strict-dynamic’* keyword, which propagates trust from
+nonce-authorized scripts to the new scripts they insert.
+
+Or, *CSP hashes*: Hashes provide better security guarantees than nonces, because
+they take the actual script code into account.
+#+begin_src html
+script-src ’sha512-YWIzOWNiNzJjNDRlY’;
+#+end_src
+The following inline script will be executed, under the assumption that the SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
+#+begin_src html
+<script> alert(1); </script>
+#+end_src
+
+#+begin_quote
+*’strict-dynamic’ also covers hash-authorized scripts*.
+#+end_quote
+
+** Summary: How to configure CSP?
+1) *whitelist-based*: often *insecure*. Even assuming CSP best practices are followed, it is basically impossible to
+   vet entire origins;
+2) *nonce-based*: *more secure, but no guarantees* about the executed script content. Be aware of the dangers of ’strict-dynamic’;
+3) *hash-based*: *complete control* of the executed scripts, including their content, but often *too complicated to deploy* in practice.
