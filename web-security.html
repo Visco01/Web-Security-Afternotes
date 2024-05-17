@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Web Security</title>
-<!-- 2024-05-17 Fri 11:10 -->
+<!-- 2024-05-17 Fri 15:47 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Org-mode">
@@ -260,6 +260,16 @@ MathJax.Hub.Config({
 <li><a href="#sec-5-4">5.4. Vulnerability: Login CSRF</a></li>
 <li><a href="#sec-5-5">5.5. CSRF prevention: summary</a></li>
 <li><a href="#sec-5-6">5.6. XSS vs CSRF</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">6. Frames Security</a>
+<ul class="nav">
+<li><a href="#sec-6-1">6.1. Domain relaxation</a></li>
+<li><a href="#sec-6-2">6.2. postMessage</a></li>
+<li><a href="#sec-6-3">6.3. Frame sandboxing</a></li>
+<li><a href="#sec-6-4">6.4. Clickjacking</a></li>
+<li><a href="#sec-6-5">6.5. CSP vs XFO</a></li>
+<li><a href="#sec-6-6">6.6. SameSite Cookies and Clickjacking</a></li>
 </ul>
 </li>
 </ul>
@@ -1133,10 +1143,337 @@ most cases.
 </div>
 </div>
 </div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6"><span class="section-number-2">6</span> Frames Security</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+A frame is a part of a web page which <b>renders content independently of its
+container</b>.
+It is usually used for:
+</p>
+<ul class="org-ul">
+<li><b>advertisement</b>: content served by an advertisement network is placed in a
+separate area to generate revenue;
+</li>
+<li><b>authentication</b>: login form of a single sign-on provider is placed in a
+separate area, which looks the same on all the including websites;
+</li>
+<li><b>gadgets</b>: “like” buttons and such
+</li>
+</ul>
+
+<p>
+The parent frame and its children keep <b>living in their own origins</b>.
+</p>
+
+<blockquote>
+<p>
+<b>Prevent framing</b>: The operators of good.com might want to forbid framing
+ content from evil.com, for example because it displays inappropriate content:
+ they can do this by using the <b>frame-src</b> directive of CSP.
+</p>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Prevent being framed</b>: The operators of good.com might want to forbid being
+ framed from evil.com, for example to mitigate phishing attempts: they can do
+ this by using the <b>X-Frame-Options</b> header or the <b>frame-ancestors</b> directive of
+ CSP.
+</p>
+</blockquote>
+
+<p>
+Frames on the same origin can communicate by <b>reading and writing</b> over their
+DOMs, since SOP does not isolate them.
+</p>
+</div>
+<div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1"><span class="section-number-3">6.1</span> Domain relaxation</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+Frames on the same site can relax their document.domain property to get the same
+origin and enable communication. \(p_{1}\) at <a href="https://www.foo.com">https://www.foo.com</a> loads \(p_{2}\) at
+<a href="https://mail.foo.com">https://mail.foo.com</a> inside a frame, then the two frames can communicate as
+follows:
+</p>
+<ol class="org-ol">
+<li>\(p_{1}\) sets document.domain to foo.com;
+</li>
+<li>\(p_{2}\) sets document.domain to foo.com;
+</li>
+<li>\(p_{1}\) and \(p_{2}\) now have the same origin and can communicate.
+</li>
+</ol>
+
+<p>
+This can have security implications:
+</p>
+</div>
+</div>
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2"><span class="section-number-3">6.2</span> postMessage</h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+Frame communication between different origins is better implemented by means of
+the postMessage API.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-javascript">targetWindow.postMessage(message, targetOrigin);
+</pre>
+</div>
+
+<p>
+Message reception:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-javascript">window.addEventListener(<span style="color: #79740e;">"message"</span>, receiveMessage);
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-6-2-1" class="outline-4">
+<h4 id="sec-6-2-1"><span class="section-number-4">6.2.1</span> postMessage: security considerations</h4>
+<div class="outline-text-4" id="text-6-2-1">
+<p>
+postMessage is better than domain relaxation for frame communication, because it
+is more general and exchanges serialized data <b>without granting scripting access</b>
+to the frame.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3"><span class="section-number-3">6.3</span> Frame sandboxing</h3>
+<div class="outline-text-3" id="text-6-3">
+<p>
+It is possible to restrict the privileges of frames by setting the sandbox
+attribute to the empty string. The most important restrictions are:
+</p>
+<ol class="org-ol">
+<li>the content of the frame is treated as being from a <b>unique origin</b>, thus
+enforcing frame isolation thanks to SOP;
+</li>
+<li><b>form submission</b> from the frame is blocked;
+</li>
+<li>all forms of <b>script execution</b> in the frame are blocked;
+</li>
+<li><b>plugin execution</b> in the frame is blocked;
+</li>
+<li><b>popup creation</b> from the frame is blocked;
+</li>
+<li><b>top-level navigation</b> via window.top.location is blocked.
+</li>
+</ol>
+
+<p>
+It is possible to relax individual security restrictions:
+</p>
+
+<table class="table table-striped table-bordered table-hover table-condensed">
+
+
+<colgroup>
+<col  class="left">
+
+<col  class="left">
+</colgroup>
+<tbody>
+<tr>
+<td class="text-left"><b>Default Restriction</b></td>
+<td class="text-left"><b>Relaxed with</b></td>
+</tr>
+
+<tr>
+<td class="text-left">enforce unique origin</td>
+<td class="text-left">allow-same-origin</td>
+</tr>
+
+<tr>
+<td class="text-left">form submission is blocked</td>
+<td class="text-left">allow-forms</td>
+</tr>
+
+<tr>
+<td class="text-left">script execution is blocked</td>
+<td class="text-left">allow-scripts</td>
+</tr>
+
+<tr>
+<td class="text-left">popup creation is blocked</td>
+<td class="text-left">allow-popups</td>
+</tr>
+
+<tr>
+<td class="text-left">top-level navigation is blocked</td>
+<td class="text-left">allow-top-navigation</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+<b>Example:</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-html">&lt;<span style="color: #b57614;">iframe</span> <span style="color: #076678;">src</span>=<span style="color: #79740e;">"https://platform.twitter.com/tweet_button.html"</span>
+        <span style="color: #076678;">sandbox</span>=<span style="color: #79740e;">"allow-same-origin allow-scripts</span>
+<span style="color: #79740e;">                 allow-popups allow-forms"</span>/&gt;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4"><span class="section-number-3">6.4</span> Clickjacking</h3>
+<div class="outline-text-3" id="text-6-4">
+<p>
+Clickjacking is a UI-based attack in which a user is tricked into clicking on
+actionable content on a target website by clicking on some other content in a
+decoy website, operated by the attacker.
+</p>
+
+<p>
+The attacker uses the opacity and z-index attributes of CSS to place a
+transparent frame pointing to the target website on top of content of the decoy
+website.
+</p>
+
+<p>
+<b>Clickjacking is a great technique to bypass CSRF protection, because the request
+comes from a same-site position!</b>
+</p>
+</div>
+<div id="outline-container-sec-6-4-1" class="outline-4">
+<h4 id="sec-6-4-1"><span class="section-number-4">6.4.1</span> Solutions against clickjacking: <b>X-Frame-Options</b></h4>
+<div class="outline-text-4" id="text-6-4-1">
+<p>
+A better solution against clickjacking is based on the X-Frame-Options header
+(XFO for short). It can take three possible values:
+</p>
+<ul class="org-ul">
+<li><b>DENY</b>: page framing is denied;
+</li>
+<li><b>SAMEORIGIN</b>: page framing is only allowed on the same origin;
+</li>
+<li><b>ALLOW-FROM</b> \(u\): page framing is only allowed at \(u\)
+</li>
+</ul>
+
+<p>
+<b>Note that ALLOW-FROM is not supported by Chrome and derivates</b>.
+</p>
+</div>
+<ol class="org-ol"><li><a id="sec-6-4-1-1" name="sec-6-4-1-1"></a>Problems with XFO<br ><div class="outline-text-5" id="text-6-4-1-1">
+<blockquote>
+<p>
+<b>Limited Expressiveness</b>: XFO does not allow to express useful policies like:
+</p>
+<ul class="org-ul">
+<li>framing is allowed on any origin from a whitelist
+</li>
+<li>framing is allowed on any subdomain of a given site
+</li>
+</ul>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Incomplete Specification</b>: was implemented in browsers before being
+ standardized, different browsers might give different interpretations to the
+ same value.
+</p>
+</blockquote>
+</div>
+</li>
+<li><a id="sec-6-4-1-2" name="sec-6-4-1-2"></a>Double Framing<br ><div class="outline-text-5" id="text-6-4-1-2">
+<p>
+The XFO specification does not mandate whether origin checks have to be
+performed on the top-level browsing context or on the full chain of ancestors,
+hence some browsers are subject to double framing attacks.
+</p>
+
+<p>
+An attacker who exploits a markup injection at good.com can perform clickjacking
+by abusing nested frames, unless the browser checks the full chain of frame
+ancestors.
+</p>
+
+<p>
+The <b>frame-ancestors</b> directive introduced in <b>CSP Level 2</b> is the best protection
+mechanism against clickjacking on modern browsers:
+</p>
+<ul class="org-ul">
+<li>it leverages the full expressive power of the source expressions of CSP;
+</li>
+<li>it solves the issue of double framing, since all ancestors are checked
+</li>
+<li>it overrides XFO in browsers supporting CSP Level 2
+</li>
+</ul>
+</div>
+</li></ol>
+</div>
+</div>
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5"><span class="section-number-3">6.5</span> CSP vs XFO</h3>
+<div class="outline-text-3" id="text-6-5">
+<blockquote>
+<p>
+A policy p is <b>security-oriented</b> if and only if:
+</p>
+<ul class="org-ul">
+<li>\(p\) is consistent for the set of legacy browsers \(B_{l}\)
+</li>
+<li>\(p\) is consistent for the set of legacy browsers \(B_{m}\)
+</li>
+<li>for any \(b_{l}\) in \(B_{l}\) and \(b_{m}\) in \(B_{m}\), the security restrictions on \(b_{l}\) are no weaker than the security restrictions on \(b_{m}\)
+</li>
+</ul>
+</blockquote>
+
+<blockquote>
+<p>
+A policy p is <b>compatibility-oriented</b> if and only if:
+</p>
+<ul class="org-ul">
+<li>\(p\) is consistent for the set of legacy browsers \(B_{l}\)
+</li>
+<li>\(p\) is consistent for the set of legacy browsers \(B_{m}\)
+</li>
+<li>for any \(b_{l}\) in \(B_{l}\) and \(b_{m}\) in \(B_{m}\), the security restrictions on \(b_{m}\) are no weaker than the security restrictions on \(b_{l}\)
+</li>
+</ul>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6"><span class="section-number-3">6.6</span> SameSite Cookies and Clickjacking</h3>
+<div class="outline-text-3" id="text-6-6">
+<p>
+<b>Cookies with the SameSite attribute (Strict or Lax) are not included in requests
+sent from a frame embedded in a cross-site position</b>:
+</p>
+<ul class="org-ul">
+<li>effective against most clickjacking attempts, i.e., those abusing
+authentication to achieve <b>effects similar to CSRF</b>;
+</li>
+<li><b>legacy browsers do not support the SameSite attribute</b>, so this can only be
+part of a defense-in-depth strategy (use XFO and CSP);
+</li>
+<li>web applications implementing authentication without using cookies, e.g., on
+top of the web storage, must still rely on <b>XFO and CSP to prevent clickjacking</b>
+attempts.
+</li>
+</ul>
+</div>
+</div>
+</div>
 </div></div></div>
 <footer id="postamble" class="">
 <div><p class="author">Author: Pietro Visconti</p>
-<p class="date">Created: 2024-05-17 Fri 11:10</p>
+<p class="date">Created: 2024-05-17 Fri 15:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="http://orgmode.org">Org-mode</a> 9.7)</p>
 </div>
 </footer>

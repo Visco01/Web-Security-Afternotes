@@ -397,3 +397,163 @@ Both XSS and CSRF are dangerous attacks. Notice that:
   against CSRF is effective, because *the attacker operates from a same-site
   position*. This means that XSS is a more serious security concern than CSRF in
   most cases.
+
+* Frames Security
+A frame is a part of a web page which *renders content independently of its
+container*.
+It is usually used for:
+- *advertisement*: content served by an advertisement network is placed in a
+  separate area to generate revenue;
+- *authentication*: login form of a single sign-on provider is placed in a
+  separate area, which looks the same on all the including websites;
+- *gadgets*: “like” buttons and such
+
+The parent frame and its children keep *living in their own origins*.
+
+#+begin_quote
+*Prevent framing*: The operators of good.com might want to forbid framing
+ content from evil.com, for example because it displays inappropriate content:
+ they can do this by using the *frame-src* directive of CSP.
+#+end_quote
+
+#+begin_quote
+*Prevent being framed*: The operators of good.com might want to forbid being
+ framed from evil.com, for example to mitigate phishing attempts: they can do
+ this by using the *X-Frame-Options* header or the *frame-ancestors* directive of
+ CSP.
+#+end_quote
+
+Frames on the same origin can communicate by *reading and writing* over their
+DOMs, since SOP does not isolate them.
+
+** Domain relaxation
+Frames on the same site can relax their document.domain property to get the same
+origin and enable communication. $p_{1}$ at https://www.foo.com loads $p_{2}$ at
+https://mail.foo.com inside a frame, then the two frames can communicate as
+follows:
+1) $p_{1}$ sets document.domain to foo.com;
+2) $p_{2}$ sets document.domain to foo.com;
+3) $p_{1}$ and $p_{2}$ now have the same origin and can communicate.
+
+This can have security implications:
+
+** postMessage
+Frame communication between different origins is better implemented by means of
+the postMessage API.
+
+#+begin_src javascript
+targetWindow.postMessage(message, targetOrigin);
+#+end_src
+
+Message reception:
+#+begin_src javascript
+window.addEventListener("message", receiveMessage);
+#+end_src
+
+*** postMessage: security considerations
+postMessage is better than domain relaxation for frame communication, because it
+is more general and exchanges serialized data *without granting scripting access*
+to the frame.
+
+** Frame sandboxing
+It is possible to restrict the privileges of frames by setting the sandbox
+attribute to the empty string. The most important restrictions are:
+1) the content of the frame is treated as being from a *unique origin*, thus
+   enforcing frame isolation thanks to SOP;
+2) *form submission* from the frame is blocked;
+3) all forms of *script execution* in the frame are blocked;
+4) *plugin execution* in the frame is blocked;
+5) *popup creation* from the frame is blocked;
+6) *top-level navigation* via window.top.location is blocked.
+
+It is possible to relax individual security restrictions:
+
+| *Default Restriction*           | *Relaxed with*       |
+| enforce unique origin           | allow-same-origin    |
+| form submission is blocked      | allow-forms          |
+| script execution is blocked     | allow-scripts        |
+| popup creation is blocked       | allow-popups         |
+| top-level navigation is blocked | allow-top-navigation |
+
+*Example:*
+#+begin_src html
+<iframe src="https://platform.twitter.com/tweet_button.html"
+        sandbox="allow-same-origin allow-scripts
+                 allow-popups allow-forms"/>
+#+end_src
+
+** Clickjacking
+Clickjacking is a UI-based attack in which a user is tricked into clicking on
+actionable content on a target website by clicking on some other content in a
+decoy website, operated by the attacker.
+
+The attacker uses the opacity and z-index attributes of CSS to place a
+transparent frame pointing to the target website on top of content of the decoy
+website.
+
+*Clickjacking is a great technique to bypass CSRF protection, because the request
+comes from a same-site position!*
+
+*** Solutions against clickjacking: *X-Frame-Options*
+A better solution against clickjacking is based on the X-Frame-Options header
+(XFO for short). It can take three possible values:
+- *DENY*: page framing is denied;
+- *SAMEORIGIN*: page framing is only allowed on the same origin;
+- *ALLOW-FROM* $u$: page framing is only allowed at $u$
+
+*Note that ALLOW-FROM is not supported by Chrome and derivates*.
+
+**** Problems with XFO
+#+begin_quote
+*Limited Expressiveness*: XFO does not allow to express useful policies like:
+- framing is allowed on any origin from a whitelist
+- framing is allowed on any subdomain of a given site
+#+end_quote
+
+#+begin_quote
+*Incomplete Specification*: was implemented in browsers before being
+ standardized, different browsers might give different interpretations to the
+ same value.
+#+end_quote
+
+**** Double Framing
+The XFO specification does not mandate whether origin checks have to be
+performed on the top-level browsing context or on the full chain of ancestors,
+hence some browsers are subject to double framing attacks.
+
+An attacker who exploits a markup injection at good.com can perform clickjacking
+by abusing nested frames, unless the browser checks the full chain of frame
+ancestors.
+
+The *frame-ancestors* directive introduced in *CSP Level 2* is the best protection
+mechanism against clickjacking on modern browsers:
+- it leverages the full expressive power of the source expressions of CSP;
+- it solves the issue of double framing, since all ancestors are checked
+- it overrides XFO in browsers supporting CSP Level 2
+
+** CSP vs XFO
+
+#+begin_quote
+A policy p is *security-oriented* if and only if:
+- $p$ is consistent for the set of legacy browsers $B_{l}$
+- $p$ is consistent for the set of legacy browsers $B_{m}$
+- for any $b_{l}$ in $B_{l}$ and $b_{m}$ in $B_{m}$, the security restrictions on $b_{l}$ are no weaker than the security restrictions on $b_{m}$
+#+end_quote
+
+#+begin_quote
+A policy p is *compatibility-oriented* if and only if:
+- $p$ is consistent for the set of legacy browsers $B_{l}$
+- $p$ is consistent for the set of legacy browsers $B_{m}$
+- for any $b_{l}$ in $B_{l}$ and $b_{m}$ in $B_{m}$, the security restrictions on $b_{m}$ are no weaker than the security restrictions on $b_{l}$
+#+end_quote
+
+** SameSite Cookies and Clickjacking
+*Cookies with the SameSite attribute (Strict or Lax) are not included in requests
+sent from a frame embedded in a cross-site position*:
+- effective against most clickjacking attempts, i.e., those abusing
+  authentication to achieve *effects similar to CSRF*;
+- *legacy browsers do not support the SameSite attribute*, so this can only be
+  part of a defense-in-depth strategy (use XFO and CSP);
+- web applications implementing authentication without using cookies, e.g., on
+  top of the web storage, must still rely on *XFO and CSP to prevent clickjacking*
+  attempts.
