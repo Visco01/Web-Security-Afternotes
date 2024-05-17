@@ -205,8 +205,8 @@ javascript:alert()//"){}alert();//</a><script>alert()</script>
 | Sometimes restrictive                               | Sometimes necessary                                     |
 
 * Content Security Policy (CSP)
-CSP was born as an industrial effort to design a *declarative client-side defense*
-mechanism *against XSS* in 2010:
+CSP was born as an industrial effort to design a *declarative client-side
+defense* mechanism *against XSS* in 2010:
 - Now supported by all major web browsers;
 - Useful defense-in-depth (*mitigation*) approach against XSS: it does not
   substitute input sanitization and output encoding;
@@ -238,21 +238,23 @@ policy on the page.
 ** CSP Roadblocks
 1) *Whitelist*: The simplest way to build whitelists is to enforce a restrictive
    CSP as report-only via the *Content-Security-Policy-Report-Only* header;
-2) *Inline Scripts and Friends*: CSP forbids inline scripts, event handlers and javascript, so one has to:
+2) *Inline Scripts and Friends*: CSP forbids inline scripts, event handlers and
+   javascript, so one has to:
    1) Move inline scripts to external files;
    2) Replace event handlers with listeners registered by external scripts;
    3) Replace javascript: URLs with script-initiated code.
-3) *String-to-Code Transformations*: Functions like eval and setTimeout can be used to transform strings into code, thus leading to injections.
+3) *String-to-Code Transformations*: Functions like eval and setTimeout can be
+   used to transform strings into code, thus leading to injections.
 
 ** CSP Nonces
 CSP can now be used to whitelist scripts (inline or external) bearing a *valid
 nonce*, i.e., a random, unpredictable string:
 #+begin_src html
-script-src  ’self’ https://example.com ’nonce-54321’;
-default-src ’self’
+script-src ’self’ https://example.com ’nonce-54321’; default-src ’self’
 #+end_src
 
-Individual inline scripts can be whitelisted using the nonce attribute (the same nonce can be used for many inline scripts):
+Individual inline scripts can be whitelisted using the nonce attribute (the same
+nonce can be used for many inline scripts):
 #+begin_src html
 <script nonce="54321"> alert(1); </script>
 #+end_src
@@ -278,7 +280,8 @@ they take the actual script code into account.
 #+begin_src html
 script-src ’sha512-YWIzOWNiNzJjNDRlY’;
 #+end_src
-The following inline script will be executed, under the assumption that the SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
+The following inline script will be executed, under the assumption that the
+SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
 #+begin_src html
 <script> alert(1); </script>
 #+end_src
@@ -288,7 +291,109 @@ The following inline script will be executed, under the assumption that the SHA-
 #+end_quote
 
 ** Summary: How to configure CSP?
-1) *whitelist-based*: often *insecure*. Even assuming CSP best practices are followed, it is basically impossible to
-   vet entire origins;
-2) *nonce-based*: *more secure, but no guarantees* about the executed script content. Be aware of the dangers of ’strict-dynamic’;
-3) *hash-based*: *complete control* of the executed scripts, including their content, but often *too complicated to deploy* in practice.
+1) *whitelist-based*: often *insecure*. Even assuming CSP best practices are
+   followed, it is basically impossible to vet entire origins;
+2) *nonce-based*: *more secure, but no guarantees* about the executed script
+   content. Be aware of the dangers of ’strict-dynamic’;
+3) *hash-based*: *complete control* of the executed scripts, including their
+   content, but often *too complicated to deploy* in practice.
+
+
+* Cross-site request forgery
+CSRF is enabled by the attachment of session cookies to HTTP requests forged by
+malicious pages.
+
+** How to prevent CSRF?
+- *Server-side fixes*: Do not authenticate requests based on cookies alone;
+- *Client-side fixes*: Change the way cookies work: modern browsers offer a
+  native protection mechanism via the *SameSite* cookie attribute.
+
+#+begin_quote
+*Referer checking*: A possible defense against CSRF is checking the content of
+ the Referer header of security-sensitive HTTP requests. This header contains
+ the full URL of the page which sent the request.
+#+end_quote
+
+#+begin_quote
+*Origin checking*: Rather than checking the value of the Referer header, one can
+ check the value of the Origin header introduced for CORS:
+ - *privacy-friendly* version of Referer: it includes just the origin, not the
+   entire URL;
+ - always attached to XHR requests by default
+ - in modern browsers: also attached to cross-origin *POST requests*, e.g., upon
+   form submission
+
+ In general, *Origin checking should be preferred over Referer checking*, but the
+ two mechanisms share similar limitations.
+#+end_quote
+
+#+begin_quote
+*Custom headers*: Another defense relies on custom headers, e.g., *CSRF-Protection: 1*. The presence of the header already suffices and its value is unimportant, since SOP prevents the use of custom headers on cross-origin requests.
+#+end_quote
+
+#+begin_quote
+*Secret tokens*: The most common defense against CSRF deployed in the wild is the inclusion of secret tokens as part of security-sensitive requests. The expected value of the secret token is typically stored in the user’s session at the server side: only requests bearing a valid token are processed by the web application.
+#+end_quote
+
+** Double Sumbit
+The *double submit pattern* is a popular approach to the use of tokens:
+- the token is still embedded as a parameter of each sensitive HTTP request, as
+  in the previous example, *but the right value of the token is stored inside a
+    cookie* (rather than in the session);
+- Every time a sensitive HTTP request is received, *the server checks that the
+    value of the cookie matches the value of the parameter*;
+- As before: the attacker cannot craft a request with the right value of the parameter (unless they know the value of the cookie).
+
+*** Double Submit: Cookie confidentiality
+Since the double submit pattern stores a secret token inside a cookie, the confidentiality of the cookie must be ensured:
+- Mark the cookie with the *Secure* attribute to prevent its disclosure;
+- Perhaps surprisingly, notice that the *HttpOnly attribute does not
+  provide much help* here!
+
+*Secure implementation*: Alternatively, adopt the Secure- prefix to ensure
+cookie integrity.
+
+** SameSite Cookies
+Cookies marked with the *SameSite attribute* can be configured so that they are
+not attached to cross-site requests:
+- *site = registrable domain* (e.g., google.com) and its subdomains;
+- *SameSite=Strict*: applies this policy to every HTTP request, thus
+offering high security, but with the risk of breaking web applications
+- *SameSite=Lax*: relaxes this restriction in the case of top-level navigations
+  with a safe method, e.g., resulting from clicking a link
+
+This defense is simple and effective, but it does not offer protection to legacy
+browsers, hence also more traditional defenses like tokens should be
+implemented.
+
+** Vulnerability: Login CSRF
+If the login form of a web application is not protected against CSRF, the
+attacker can force the victim into authenticating using the attacker’s account:
+this attack is known as *login CSRF*.
+
+*Defense*:
+- *header checks* upon login form submission;
+- *secret tokens* in the login form: since login CSRF happens before the
+  authenticated session, you must setup a pre-session for the token (commonly
+  used);
+- *SameSite cookies*: just require the presence of a SameSite cookie upon login
+  form submission. This requires enforcing cookie integrity against network
+  attackers, otherwise the cookie could be forged
+
+** CSRF prevention: summary
+1) Checking the content of the Referer / Origin header or the mere
+   presence of custom headers might work, but this is often impractical;
+1) Secret tokens are better for most applications, but implementation is not
+   straightforward;
+3) SameSite cookies are a simple and elegant solution against CSRF, which solves
+   the issues of tokens, but only protects modern browsers and a part of the
+   state-changing requests.
+
+   *Best practice: SameSite cookies + secret tokens.*
+
+** XSS vs CSRF
+Both XSS and CSRF are dangerous attacks. Notice that:
+- if a web application is vulnerable against XSS, none of the proposed defenses
+  against CSRF is effective, because *the attacker operates from a same-site
+  position*. This means that XSS is a more serious security concern than CSRF in
+  most cases.

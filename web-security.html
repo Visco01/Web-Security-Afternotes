@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Web Security</title>
-<!-- 2024-05-09 Thu 11:17 -->
+<!-- 2024-05-17 Fri 11:10 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Org-mode">
@@ -250,6 +250,16 @@ MathJax.Hub.Config({
 <li><a href="#sec-4-4">4.4. CSP Nonces</a></li>
 <li><a href="#sec-4-5">4.5. Supporting dynamic scripts</a></li>
 <li><a href="#sec-4-6">4.6. Summary: How to configure CSP?</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">5. Cross-site request forgery</a>
+<ul class="nav">
+<li><a href="#sec-5-1">5.1. How to prevent CSRF?</a></li>
+<li><a href="#sec-5-2">5.2. Double Sumbit</a></li>
+<li><a href="#sec-5-3">5.3. SameSite Cookies</a></li>
+<li><a href="#sec-5-4">5.4. Vulnerability: Login CSRF</a></li>
+<li><a href="#sec-5-5">5.5. CSRF prevention: summary</a></li>
+<li><a href="#sec-5-6">5.6. XSS vs CSRF</a></li>
 </ul>
 </li>
 </ul>
@@ -716,8 +726,8 @@ A polyglot is an exploit working in several different contexts:
 <h2 id="sec-4"><span class="section-number-2">4</span> Content Security Policy (CSP)</h2>
 <div class="outline-text-2" id="text-4">
 <p>
-CSP was born as an industrial effort to design a <b>declarative client-side defense</b>
-mechanism <b>against XSS</b> in 2010:
+CSP was born as an industrial effort to design a <b>declarative client-side
+defense</b> mechanism <b>against XSS</b> in 2010:
 </p>
 <ul class="org-ul">
 <li>Now supported by all major web browsers;
@@ -818,7 +828,8 @@ policy on the page.
 <li><b>Whitelist</b>: The simplest way to build whitelists is to enforce a restrictive
 CSP as report-only via the <b>Content-Security-Policy-Report-Only</b> header;
 </li>
-<li><b>Inline Scripts and Friends</b>: CSP forbids inline scripts, event handlers and javascript, so one has to:
+<li><b>Inline Scripts and Friends</b>: CSP forbids inline scripts, event handlers and
+javascript, so one has to:
 <ol class="org-ol">
 <li>Move inline scripts to external files;
 </li>
@@ -828,7 +839,8 @@ CSP as report-only via the <b>Content-Security-Policy-Report-Only</b> header;
 </li>
 </ol>
 </li>
-<li><b>String-to-Code Transformations</b>: Functions like eval and setTimeout can be used to transform strings into code, thus leading to injections.
+<li><b>String-to-Code Transformations</b>: Functions like eval and setTimeout can be
+used to transform strings into code, thus leading to injections.
 </li>
 </ol>
 </div>
@@ -842,13 +854,13 @@ nonce</b>, i.e., a random, unpredictable string:
 </p>
 <div class="org-src-container">
 
-<pre class="src src-html">script-src  &#8217;self&#8217; https://example.com &#8217;nonce-54321&#8217;;
-default-src &#8217;self&#8217;
+<pre class="src src-html">script-src &#8217;self&#8217; https://example.com &#8217;nonce-54321&#8217;; default-src &#8217;self&#8217;
 </pre>
 </div>
 
 <p>
-Individual inline scripts can be whitelisted using the nonce attribute (the same nonce can be used for many inline scripts):
+Individual inline scripts can be whitelisted using the nonce attribute (the same
+nonce can be used for many inline scripts):
 </p>
 <div class="org-src-container">
 
@@ -895,7 +907,8 @@ they take the actual script code into account.
 </pre>
 </div>
 <p>
-The following inline script will be executed, under the assumption that the SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
+The following inline script will be executed, under the assumption that the
+SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
 </p>
 <div class="org-src-container">
 
@@ -914,21 +927,216 @@ The following inline script will be executed, under the assumption that the SHA-
 <h3 id="sec-4-6"><span class="section-number-3">4.6</span> Summary: How to configure CSP?</h3>
 <div class="outline-text-3" id="text-4-6">
 <ol class="org-ol">
-<li><b>whitelist-based</b>: often <b>insecure</b>. Even assuming CSP best practices are followed, it is basically impossible to
-vet entire origins;
+<li><b>whitelist-based</b>: often <b>insecure</b>. Even assuming CSP best practices are
+followed, it is basically impossible to vet entire origins;
 </li>
-<li><b>nonce-based</b>: <b>more secure, but no guarantees</b> about the executed script content. Be aware of the dangers of ’strict-dynamic’;
+<li><b>nonce-based</b>: <b>more secure, but no guarantees</b> about the executed script
+content. Be aware of the dangers of ’strict-dynamic’;
 </li>
-<li><b>hash-based</b>: <b>complete control</b> of the executed scripts, including their content, but often <b>too complicated to deploy</b> in practice.
+<li><b>hash-based</b>: <b>complete control</b> of the executed scripts, including their
+content, but often <b>too complicated to deploy</b> in practice.
 </li>
 </ol>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5"><span class="section-number-2">5</span> Cross-site request forgery</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+CSRF is enabled by the attachment of session cookies to HTTP requests forged by
+malicious pages.
+</p>
+</div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1"><span class="section-number-3">5.1</span> How to prevent CSRF?</h3>
+<div class="outline-text-3" id="text-5-1">
+<ul class="org-ul">
+<li><b>Server-side fixes</b>: Do not authenticate requests based on cookies alone;
+</li>
+<li><b>Client-side fixes</b>: Change the way cookies work: modern browsers offer a
+native protection mechanism via the <b>SameSite</b> cookie attribute.
+</li>
+</ul>
+
+<blockquote>
+<p>
+<b>Referer checking</b>: A possible defense against CSRF is checking the content of
+ the Referer header of security-sensitive HTTP requests. This header contains
+ the full URL of the page which sent the request.
+</p>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Origin checking</b>: Rather than checking the value of the Referer header, one can
+ check the value of the Origin header introduced for CORS:
+</p>
+<ul class="org-ul">
+<li><b>privacy-friendly</b> version of Referer: it includes just the origin, not the
+entire URL;
+</li>
+<li>always attached to XHR requests by default
+</li>
+<li>in modern browsers: also attached to cross-origin <b>POST requests</b>, e.g., upon
+form submission
+</li>
+</ul>
+
+<p>
+In general, <b>Origin checking should be preferred over Referer checking</b>, but the
+two mechanisms share similar limitations.
+</p>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Custom headers</b>: Another defense relies on custom headers, e.g., <b>CSRF-Protection: 1</b>. The presence of the header already suffices and its value is unimportant, since SOP prevents the use of custom headers on cross-origin requests.
+</p>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Secret tokens</b>: The most common defense against CSRF deployed in the wild is the inclusion of secret tokens as part of security-sensitive requests. The expected value of the secret token is typically stored in the user’s session at the server side: only requests bearing a valid token are processed by the web application.
+</p>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2"><span class="section-number-3">5.2</span> Double Sumbit</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+The <b>double submit pattern</b> is a popular approach to the use of tokens:
+</p>
+<ul class="org-ul">
+<li>the token is still embedded as a parameter of each sensitive HTTP request, as
+in the previous example, <b>but the right value of the token is stored inside a
+  cookie</b> (rather than in the session);
+</li>
+<li>Every time a sensitive HTTP request is received, <b>the server checks that the
+value of the cookie matches the value of the parameter</b>;
+</li>
+<li>As before: the attacker cannot craft a request with the right value of the parameter (unless they know the value of the cookie).
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-5-2-1" class="outline-4">
+<h4 id="sec-5-2-1"><span class="section-number-4">5.2.1</span> Double Submit: Cookie confidentiality</h4>
+<div class="outline-text-4" id="text-5-2-1">
+<p>
+Since the double submit pattern stores a secret token inside a cookie, the confidentiality of the cookie must be ensured:
+</p>
+<ul class="org-ul">
+<li>Mark the cookie with the <b>Secure</b> attribute to prevent its disclosure;
+</li>
+<li>Perhaps surprisingly, notice that the <b>HttpOnly attribute does not
+provide much help</b> here!
+</li>
+</ul>
+
+<p>
+<b>Secure implementation</b>: Alternatively, adopt the Secure- prefix to ensure
+cookie integrity.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3"><span class="section-number-3">5.3</span> SameSite Cookies</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+Cookies marked with the <b>SameSite attribute</b> can be configured so that they are
+not attached to cross-site requests:
+</p>
+<ul class="org-ul">
+<li><b>site = registrable domain</b> (e.g., google.com) and its subdomains;
+</li>
+<li><b>SameSite=Strict</b>: applies this policy to every HTTP request, thus
+</li>
+</ul>
+<p>
+offering high security, but with the risk of breaking web applications
+</p>
+<ul class="org-ul">
+<li><b>SameSite=Lax</b>: relaxes this restriction in the case of top-level navigations
+with a safe method, e.g., resulting from clicking a link
+</li>
+</ul>
+
+<p>
+This defense is simple and effective, but it does not offer protection to legacy
+browsers, hence also more traditional defenses like tokens should be
+implemented.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4"><span class="section-number-3">5.4</span> Vulnerability: Login CSRF</h3>
+<div class="outline-text-3" id="text-5-4">
+<p>
+If the login form of a web application is not protected against CSRF, the
+attacker can force the victim into authenticating using the attacker’s account:
+this attack is known as <b>login CSRF</b>.
+</p>
+
+<p>
+<b>Defense</b>:
+</p>
+<ul class="org-ul">
+<li><b>header checks</b> upon login form submission;
+</li>
+<li><b>secret tokens</b> in the login form: since login CSRF happens before the
+authenticated session, you must setup a pre-session for the token (commonly
+used);
+</li>
+<li><b>SameSite cookies</b>: just require the presence of a SameSite cookie upon login
+form submission. This requires enforcing cookie integrity against network
+attackers, otherwise the cookie could be forged
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-5-5" class="outline-3">
+<h3 id="sec-5-5"><span class="section-number-3">5.5</span> CSRF prevention: summary</h3>
+<div class="outline-text-3" id="text-5-5">
+<ol class="org-ol">
+<li>Checking the content of the Referer / Origin header or the mere
+presence of custom headers might work, but this is often impractical;
+</li>
+<li>Secret tokens are better for most applications, but implementation is not
+straightforward;
+</li>
+<li>SameSite cookies are a simple and elegant solution against CSRF, which solves
+the issues of tokens, but only protects modern browsers and a part of the
+state-changing requests.
+
+<p>
+<b>Best practice: SameSite cookies + secret tokens.</b>
+</p>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-5-6" class="outline-3">
+<h3 id="sec-5-6"><span class="section-number-3">5.6</span> XSS vs CSRF</h3>
+<div class="outline-text-3" id="text-5-6">
+<p>
+Both XSS and CSRF are dangerous attacks. Notice that:
+</p>
+<ul class="org-ul">
+<li>if a web application is vulnerable against XSS, none of the proposed defenses
+against CSRF is effective, because <b>the attacker operates from a same-site
+position</b>. This means that XSS is a more serious security concern than CSRF in
+most cases.
+</li>
+</ul>
 </div>
 </div>
 </div>
 </div></div></div>
 <footer id="postamble" class="">
 <div><p class="author">Author: Pietro Visconti</p>
-<p class="date">Created: 2024-05-09 Thu 11:17</p>
+<p class="date">Created: 2024-05-17 Fri 11:10</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="http://orgmode.org">Org-mode</a> 9.7)</p>
 </div>
 </footer>
