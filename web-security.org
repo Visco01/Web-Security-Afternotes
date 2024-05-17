@@ -557,3 +557,110 @@ sent from a frame embedded in a cross-site position*:
 - web applications implementing authentication without using cookies, e.g., on
   top of the web storage, must still rely on *XFO and CSP to prevent clickjacking*
   attempts.
+
+* HTTP & TLS
+HTTPS is the *encrypted variant* of HTTP:
+- HTTPS = HTTP on top of a cryptographic protocol (SSL / TLS);
+- HTTPS provides confidentiality, integrity and server authentication
+- support for client authentication, yet basically unused in practice
+
+** TLS
+- *asymmetric cryptography*: used to establish a symmetric key, called the session
+  key, between the client and the server;
+- *symmetric cryptography*: used to ensure the confidentiality and the integrity
+  of the exchanged messages by means of the session key;
+- *certificates*: used to provide authentication by binding the public key of the
+  server to its identity. This is done thanks to a signature issued by a trusted
+  Certification Authority (CA).
+
+*** TLS Flow
+1) The client initiates a *handshake* with the server by proposing a TLS version
+   and a list of supported cipher suites (crypto algorithms);
+2) The server chooses the lower between its highest supported *TLS version* and
+   the TLS version proposed by the client. It then picks a supported *cipher*
+   suite from the proposed list and *sends its certificate*;
+3) The client confirms the validity of the certificate and retrieves the
+   *server’s public key* from it;
+4) The client confirms the *validity of the certificate* and retrieves the
+   server’s public key from it;
+5) The client and the server take appropriate actions to generate the *session
+   key*, taking advantage of the server’s public key;
+6) The session key is used to *protect the communication*.
+
+*** Session key establishment: RSA
+1) the client generates a random number s;
+2) the client sends s to the server, encrypted with the server’s pub key;
+3) the server decrypts s using its private key;
+4) the client and the server generate the session key k from s, using a key
+   derivation algorithm.
+
+** Protocol downgrade attacks
+Downgrade attacks are often implemented as part of a MITM attack and may be used
+as a way of enabling a cryptographic attack that might not be possible
+otherwise:
+1) The *client initiates a handshake* with the server by proposing a TLS version
+   and a list of supported cipher suites;
+2) The *attacker intercepts and modifies the original message*, so that it
+   contains insecure protocol versions such as TLS 1.0 and SSL 3.0;
+3) The *server chooses the lower* between its highest supported *TLS version* and
+   the TLS version proposed by the client. It then picks a supported cipher
+   suite from the proposed list and sends its certificate;
+4) If the attack is successful, *an insecure protocol or cipher suite is used*
+
+*Mitigation techniques*:
+- Disable server-side support for legacy protocols and insecure cipher suites.
+  This might require fixes to other servers using the same certificate, i.e.,
+  using the same private key;
+- Use TLS 1.3: native protection against downgrade attacks. It is a major
+  overhaul of TLS 1.2, despite the small change to the version number
+
+** Heartbleed
+Some attacks against TLS are not enabled by the protocol design, but rather by
+its implementation! A famous example is the Heartbleed attack against OpenSSL.
+
+Simple fix: *update the OpenSSL version* or at the very least disable the
+Heartbeat extension upon compilation.
+
+** Certificates
+A certificate is a *cryptographic proof of the ownership of a public key*. It
+contains several fields, including:
+1) Serial Number: used to handle certificate revocation;
+2) Subject: the owner of the public key, i.e., the server’s identity;
+3) Public Key: the public key of the subject;
+4) Issuer: the entity who created the certificate;
+5) Validity: the validity period of the certificate;
+6) Signature: a signature of the certificate body with the issuer’s private key;
+
+#+begin_quote
+A *certificate chain* is a list of certificates such that:
+1) the Issuer of each certificate (except the last one) matches the Subject of
+   the next certificate in the list;
+2) each certificate (except the last one) can be verified using the public key
+   contained in the next certificate in the list;
+3) the last certificate is a trust anchor, i.e., a self-signed certificate that
+   one trusts because it was issued by a trusted certification authority.
+#+end_quote
+
+*** Types of certificates
+Certificates can have three different *validation levels*:
+1) *Domain Validation*: bind a public key to a domain name, i.e., they are issued
+   after showing the right to manage a domain name;
+2) *Organization Validation*: bind a public key to an organization, i.e., they
+   additionally require a proof of existence as a legal entity;
+3) *Extended Validation*: similar to Organization Validation, but with even
+   stricter rules aimed at assessing the legitimacy of the company.
+
+*** Scope of certificates
+1) *Single domain*: valid for a domain name and the www sub-domain;
+2) *Multiple domains*: valid for an arbitrary list of domain names, set in the
+   Subject Alternative Name field of the certificate;
+3) *Arbitrary sub-domains*: valid for a domain name and all its first-level
+   sub-domains, e.g., *.example.com.
+
+The scope of certificates is important:
+- if two machines share the same certificate, they also share the same public
+  and private keys!
+- once a machine is compromised and its private key is leaked, the attacker can
+  impersonate all the other machines sharing the same certificate and possibly
+  inspect traffic exchanged with them;
+- certificate reuse increases the attack surface against web apps.
