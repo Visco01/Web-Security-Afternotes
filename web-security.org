@@ -1,4 +1,5 @@
 #+title: Web Security
+#+SETUPFILE: /Users/visco/.config/doom/latex-standard-setup.org
 
 * Web Sessions Security
 
@@ -664,3 +665,79 @@ The scope of certificates is important:
   impersonate all the other machines sharing the same certificate and possibly
   inspect traffic exchanged with them;
 - certificate reuse increases the attack surface against web apps.
+
+* More HTTPS
+
+** Mixed Content Policy
+The Mixed Content policy recommends defensive techniques to mitigate the dangers
+of insecurely-loaded sub-resources.
+- *passive content* like images, audios and videos: optionally blockable, i.e.,
+  might be blocked or not at the discretion of browser vendors;
+- *active content*, i.e., the rest: must always be blocked.
+
+** CSP to TLS enforcement
+CSP provides support to simplify a full transition from HTTP to HTTPS:
+1) *upgrade-insecure-requests*: all the HTTP requests sent from the web page are
+   automatically upgraded to HTTPS before they are sent on the network. This is
+   useful to enforce HTTPS upgrade also for blockable content;
+2) *block-all-mixed-content* (now obsoleted): tells the browser that all types of
+   mixed content must be blocked. Ignored in modern browsers, because
+   upgradeable content is automatically loaded using HTTPS and blockable content
+   is already blocked
+
+** HTTP Strict Transport Security (HSTS)
+HSTS is a security policy which can be used to prevent SSL stripping:
+- HSTS instructs the browser that the server only wants to accept HTTPS
+  connections for a given duration;
+- The browser must upgrade all the HTTP requests to the server over HTTPS before
+  they are sent on the network
+- If the security of the HTTPS connection cannot be established, e.g., invalid
+  TLS certificate, the browser must stop the connection.
+
+*Strict-Transport-Security: max-age=31536000*
+
+HSTS headers must be honored by the browser only when they are served over HTTPS.
+
+*** HSTS and cookie security
+
+#+begin_quote
+*Cookie confidentiality*: Cookies with the Domain attribute can inadvertently be
+ shared with HTTP sub-domains. Communication with such domains can be forced by
+ network attackers.
+#+end_quote
+
+
+#+begin_quote
+*Cookie integrity*: Network attackers can abuse HTTP traffic from sub-domains to
+ forge cookies with the Domain attribute, which may be eventually sent to the
+ target host.
+#+end_quote
+
+*** includeSubDomains option
+HSTS can be activated with the *includeSubDomains* option to extend the HTTPS
+upgrade to sub-domains as well.
+
+#+begin_quote
+*Cookie confidentiality*: Since sub-domains cannot be contacted over HTTP, even
+ domain cookies are guaranteed to always be sent over HTTPS.
+#+end_quote
+
+#+begin_quote
+*Cookie integrity*: Since sub-domains cannot be contacted over HTTP, network
+ attackers cannot forge HTTP traffic to set domain cookies.
+#+end_quote
+
+*** HSTS Preload list
+To simplify HSTS deployment, site operators can ask for inclusion in the HSTS
+preload list, i.e., a *list of known HSTS domains that browsers will honor*.
+Connections to such domains are subject to strong HSTS policies.
+
+#+begin_quote
+*Requirements*:
+- Serve a valid certificate;
+- Redirect from HTTP to HTTPS on the same host;
+- Serve all sub-domains over HTTPS;
+- Serve an HSTS header on the base domain for HTTPS requests, with max-age set
+  to at least 1 year and includeSubDomains;
+- The HSTS policy must include the preload option.
+#+end_quote

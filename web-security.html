@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Web Security</title>
-<!-- 2024-05-17 Fri 20:51 -->
+<!-- 2024-05-18 Sat 10:14 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Org-mode">
@@ -275,6 +275,16 @@ MathJax.Hub.Config({
 <li><a href="#sec-7">7. HTTP &amp; TLS</a>
 <ul class="nav">
 <li><a href="#sec-7-1">7.1. TLS</a></li>
+<li><a href="#sec-7-2">7.2. Protocol downgrade attacks</a></li>
+<li><a href="#sec-7-3">7.3. Heartbleed</a></li>
+<li><a href="#sec-7-4">7.4. Certificates</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">8. More HTTPS</a>
+<ul class="nav">
+<li><a href="#sec-8-1">8.1. Mixed Content Policy</a></li>
+<li><a href="#sec-8-2">8.2. CSP to TLS enforcement</a></li>
+<li><a href="#sec-8-3">8.3. HTTP Strict Transport Security (HSTS)</a></li>
 </ul>
 </li>
 </ul>
@@ -1531,12 +1541,307 @@ key</b>, taking advantage of the server’s public key;
 </ol>
 </div>
 </div>
+<div id="outline-container-sec-7-1-2" class="outline-4">
+<h4 id="sec-7-1-2"><span class="section-number-4">7.1.2</span> Session key establishment: RSA</h4>
+<div class="outline-text-4" id="text-7-1-2">
+<ol class="org-ol">
+<li>the client generates a random number s;
+</li>
+<li>the client sends s to the server, encrypted with the server’s pub key;
+</li>
+<li>the server decrypts s using its private key;
+</li>
+<li>the client and the server generate the session key k from s, using a key
+derivation algorithm.
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2"><span class="section-number-3">7.2</span> Protocol downgrade attacks</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+Downgrade attacks are often implemented as part of a MITM attack and may be used
+as a way of enabling a cryptographic attack that might not be possible
+otherwise:
+</p>
+<ol class="org-ol">
+<li>The <b>client initiates a handshake</b> with the server by proposing a TLS version
+and a list of supported cipher suites;
+</li>
+<li>The <b>attacker intercepts and modifies the original message</b>, so that it
+contains insecure protocol versions such as TLS 1.0 and SSL 3.0;
+</li>
+<li>The <b>server chooses the lower</b> between its highest supported <b>TLS version</b> and
+the TLS version proposed by the client. It then picks a supported cipher
+suite from the proposed list and sends its certificate;
+</li>
+<li>If the attack is successful, <b>an insecure protocol or cipher suite is used</b>
+</li>
+</ol>
+
+<p>
+<b>Mitigation techniques</b>:
+</p>
+<ul class="org-ul">
+<li>Disable server-side support for legacy protocols and insecure cipher suites.
+This might require fixes to other servers using the same certificate, i.e.,
+using the same private key;
+</li>
+<li>Use TLS 1.3: native protection against downgrade attacks. It is a major
+overhaul of TLS 1.2, despite the small change to the version number
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-7-3" class="outline-3">
+<h3 id="sec-7-3"><span class="section-number-3">7.3</span> Heartbleed</h3>
+<div class="outline-text-3" id="text-7-3">
+<p>
+Some attacks against TLS are not enabled by the protocol design, but rather by
+its implementation! A famous example is the Heartbleed attack against OpenSSL.
+</p>
+
+<p>
+Simple fix: <b>update the OpenSSL version</b> or at the very least disable the
+Heartbeat extension upon compilation.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-7-4" class="outline-3">
+<h3 id="sec-7-4"><span class="section-number-3">7.4</span> Certificates</h3>
+<div class="outline-text-3" id="text-7-4">
+<p>
+A certificate is a <b>cryptographic proof of the ownership of a public key</b>. It
+contains several fields, including:
+</p>
+<ol class="org-ol">
+<li>Serial Number: used to handle certificate revocation;
+</li>
+<li>Subject: the owner of the public key, i.e., the server’s identity;
+</li>
+<li>Public Key: the public key of the subject;
+</li>
+<li>Issuer: the entity who created the certificate;
+</li>
+<li>Validity: the validity period of the certificate;
+</li>
+<li>Signature: a signature of the certificate body with the issuer’s private key;
+</li>
+</ol>
+
+<blockquote>
+<p>
+A <b>certificate chain</b> is a list of certificates such that:
+</p>
+<ol class="org-ol">
+<li>the Issuer of each certificate (except the last one) matches the Subject of
+the next certificate in the list;
+</li>
+<li>each certificate (except the last one) can be verified using the public key
+contained in the next certificate in the list;
+</li>
+<li>the last certificate is a trust anchor, i.e., a self-signed certificate that
+one trusts because it was issued by a trusted certification authority.
+</li>
+</ol>
+</blockquote>
+</div>
+<div id="outline-container-sec-7-4-1" class="outline-4">
+<h4 id="sec-7-4-1"><span class="section-number-4">7.4.1</span> Types of certificates</h4>
+<div class="outline-text-4" id="text-7-4-1">
+<p>
+Certificates can have three different <b>validation levels</b>:
+</p>
+<ol class="org-ol">
+<li><b>Domain Validation</b>: bind a public key to a domain name, i.e., they are issued
+after showing the right to manage a domain name;
+</li>
+<li><b>Organization Validation</b>: bind a public key to an organization, i.e., they
+additionally require a proof of existence as a legal entity;
+</li>
+<li><b>Extended Validation</b>: similar to Organization Validation, but with even
+stricter rules aimed at assessing the legitimacy of the company.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-7-4-2" class="outline-4">
+<h4 id="sec-7-4-2"><span class="section-number-4">7.4.2</span> Scope of certificates</h4>
+<div class="outline-text-4" id="text-7-4-2">
+<ol class="org-ol">
+<li><b>Single domain</b>: valid for a domain name and the www sub-domain;
+</li>
+<li><b>Multiple domains</b>: valid for an arbitrary list of domain names, set in the
+Subject Alternative Name field of the certificate;
+</li>
+<li><b>Arbitrary sub-domains</b>: valid for a domain name and all its first-level
+sub-domains, e.g., *.example.com.
+</li>
+</ol>
+
+<p>
+The scope of certificates is important:
+</p>
+<ul class="org-ul">
+<li>if two machines share the same certificate, they also share the same public
+and private keys!
+</li>
+<li>once a machine is compromised and its private key is leaked, the attacker can
+impersonate all the other machines sharing the same certificate and possibly
+inspect traffic exchanged with them;
+</li>
+<li>certificate reuse increases the attack surface against web apps.
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8"><span class="section-number-2">8</span> More HTTPS</h2>
+<div class="outline-text-2" id="text-8">
+</div><div id="outline-container-sec-8-1" class="outline-3">
+<h3 id="sec-8-1"><span class="section-number-3">8.1</span> Mixed Content Policy</h3>
+<div class="outline-text-3" id="text-8-1">
+<p>
+The Mixed Content policy recommends defensive techniques to mitigate the dangers
+of insecurely-loaded sub-resources.
+</p>
+<ul class="org-ul">
+<li><b>passive content</b> like images, audios and videos: optionally blockable, i.e.,
+might be blocked or not at the discretion of browser vendors;
+</li>
+<li><b>active content</b>, i.e., the rest: must always be blocked.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-8-2" class="outline-3">
+<h3 id="sec-8-2"><span class="section-number-3">8.2</span> CSP to TLS enforcement</h3>
+<div class="outline-text-3" id="text-8-2">
+<p>
+CSP provides support to simplify a full transition from HTTP to HTTPS:
+</p>
+<ol class="org-ol">
+<li><b>upgrade-insecure-requests</b>: all the HTTP requests sent from the web page are
+automatically upgraded to HTTPS before they are sent on the network. This is
+useful to enforce HTTPS upgrade also for blockable content;
+</li>
+<li><b>block-all-mixed-content</b> (now obsoleted): tells the browser that all types of
+mixed content must be blocked. Ignored in modern browsers, because
+upgradeable content is automatically loaded using HTTPS and blockable content
+is already blocked
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-8-3" class="outline-3">
+<h3 id="sec-8-3"><span class="section-number-3">8.3</span> HTTP Strict Transport Security (HSTS)</h3>
+<div class="outline-text-3" id="text-8-3">
+<p>
+HSTS is a security policy which can be used to prevent SSL stripping:
+</p>
+<ul class="org-ul">
+<li>HSTS instructs the browser that the server only wants to accept HTTPS
+connections for a given duration;
+</li>
+<li>The browser must upgrade all the HTTP requests to the server over HTTPS before
+they are sent on the network
+</li>
+<li>If the security of the HTTPS connection cannot be established, e.g., invalid
+TLS certificate, the browser must stop the connection.
+</li>
+</ul>
+
+<p>
+<b>Strict-Transport-Security: max-age=31536000</b>
+</p>
+
+<p>
+HSTS headers must be honored by the browser only when they are served over HTTPS.
+</p>
+</div>
+<div id="outline-container-sec-8-3-1" class="outline-4">
+<h4 id="sec-8-3-1"><span class="section-number-4">8.3.1</span> HSTS and cookie security</h4>
+<div class="outline-text-4" id="text-8-3-1">
+<blockquote>
+<p>
+<b>Cookie confidentiality</b>: Cookies with the Domain attribute can inadvertently be
+ shared with HTTP sub-domains. Communication with such domains can be forced by
+ network attackers.
+</p>
+</blockquote>
+
+
+<blockquote>
+<p>
+<b>Cookie integrity</b>: Network attackers can abuse HTTP traffic from sub-domains to
+ forge cookies with the Domain attribute, which may be eventually sent to the
+ target host.
+</p>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-sec-8-3-2" class="outline-4">
+<h4 id="sec-8-3-2"><span class="section-number-4">8.3.2</span> includeSubDomains option</h4>
+<div class="outline-text-4" id="text-8-3-2">
+<p>
+HSTS can be activated with the <b>includeSubDomains</b> option to extend the HTTPS
+upgrade to sub-domains as well.
+</p>
+
+<blockquote>
+<p>
+<b>Cookie confidentiality</b>: Since sub-domains cannot be contacted over HTTP, even
+ domain cookies are guaranteed to always be sent over HTTPS.
+</p>
+</blockquote>
+
+<blockquote>
+<p>
+<b>Cookie integrity</b>: Since sub-domains cannot be contacted over HTTP, network
+ attackers cannot forge HTTP traffic to set domain cookies.
+</p>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-sec-8-3-3" class="outline-4">
+<h4 id="sec-8-3-3"><span class="section-number-4">8.3.3</span> HSTS Preload list</h4>
+<div class="outline-text-4" id="text-8-3-3">
+<p>
+To simplify HSTS deployment, site operators can ask for inclusion in the HSTS
+preload list, i.e., a <b>list of known HSTS domains that browsers will honor</b>.
+Connections to such domains are subject to strong HSTS policies.
+</p>
+
+<blockquote>
+<p>
+<b>Requirements</b>:
+</p>
+<ul class="org-ul">
+<li>Serve a valid certificate;
+</li>
+<li>Redirect from HTTP to HTTPS on the same host;
+</li>
+<li>Serve all sub-domains over HTTPS;
+</li>
+<li>Serve an HSTS header on the base domain for HTTPS requests, with max-age set
+to at least 1 year and includeSubDomains;
+</li>
+<li>The HSTS policy must include the preload option.
+</li>
+</ul>
+</blockquote>
+</div>
+</div>
 </div>
 </div>
 </div></div></div>
 <footer id="postamble" class="">
 <div><p class="author">Author: Pietro Visconti</p>
-<p class="date">Created: 2024-05-17 Fri 20:51</p>
+<p class="date">Created: 2024-05-18 Sat 10:14</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="http://orgmode.org">Org-mode</a> 9.7)</p>
 </div>
 </footer>
