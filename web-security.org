@@ -875,3 +875,78 @@ detect automatically:
 5) put the uploaded files out of the webroot / on an external domain, so that
    SOP can provide protection
 6) put a limit on the file size to avoid denial of service.
+
+** Server-side request forgery
+SSRF is a vulnerability forcing a web application back-end into sending HTTP
+requests to a target host of the attacker’s choosing:
+- typical targets: the local host or other back-end servers sitting on the same
+  local network, protected by a firewall
+
+Why do we need server-side requests in web applications?
+*Data import*, *Previews*, *Chaching*.
+
+SSRF can also be abused to:
+1) *Attack remote servers*: the confused back-end is fooled into sending malicious
+   requests to other remote servers, so that the attack is not coming from the
+   attacker’s machine;
+2) *Bypass SOP*: the confused back-end is fooled into fetching malicious content
+   from the attacker’s server, hence the attacker gets scripting capabilities in
+   the server’s origin
+
+*** Preventing SSRF: whitelisting
+Some web applications only allow input that matches, begins with, or contains, a
+whitelist of permitted values. This is preferable, however URL parsing should be
+performed with care.
+
+** Open redirect
+An open redirect vulnerability happens when a web application redirects users to
+an attacker-controlled URL. Normally has low severity, but it may become quite
+dangerous in the context of SSRF.
+
+** XML external entities
+XML external entities is a web security vulnerability arising from the abuse of
+little known, dangerous features of the XML format.
+
+An external entity similarly binds a name to a URL:
+#+begin_src xml
+<!ENTITY server SYSTEM "http://stock.foo.com">
+#+end_src
+
+Since an XML external entity can point to any URL, e.g., resolving to a local IP
+address, it is possible to abuse XXE to perform SSRF:
+#+begin_src xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "http://192.168.0.68/admin">
+]>
+<stockCheck><productId>&xxe;</productId></stockCheck>
+#+end_src
+
+#+begin_quote
+XXE can normally be used to obtain only files or responses that contain “valid”
+XML that does not trigger parsing errors: for example, it cannot normally be
+used to leak binary files!
+#+end_quote
+
+*** Defending against XXE
+- disallow inline DTDs and use a static, local DTD if needed
+- or at least disable XXE support: many modern XML parsing libraries already do
+  that, unless you explicitly relax this security restriction
+- many libraries are vulnerable to the billion laugh attack by default!
+
+** HTTP Parameter pollution
+HTTP parameter pollution (HPP) is a vulnerability enabled by the HTTP parameter
+parsing APIs of web programming languages.
+
+#+begin_src php
+x =  = $_GET[’user’]
+#+end_src
+
+What happens if the GET parameter contains two user parameters?
+
+*** Defending against HPP
+- check the documentation of your web development framework
+- if the API gives you back a list of parameters, you already have all the
+  information you need
+- otherwise, manually parse the parameters and check that none of them occurs multiple times
+- encode the & characters to avoid the discussed attack
