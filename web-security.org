@@ -1011,3 +1011,70 @@ this purpose.
 *Once the access token is leaked, e.g., via XSS, the attacker can operate under
  the user’s identity until the token expires*!
 #+end_quote
+
+** OAuth Security
+*** CSRF
+if CitySearch does not implement CSRF protection on the review form, a web
+attacker can abuse SSO to post reviews in Alice’s name both on CitySearch and
+Facebook, thus amplifying the attack;
+
+*** Session swapping
+Even when all the sensitive forms are protected against CSRF, a broken
+implementation of OAuth might suffer from a session swapping attack. Its effects
+are equivalent to login CSRF.
+
+*** Forced profile linking
+Clients supporting authentication using both local passwords and SSO via OAuth
+may implement a profile linking functionality to connect two accounts of the
+same user, so that either set of credentials can be used:
+#+begin_src
+https://client.com/oauth-linking?code=CODE
+#+end_src
+
+1) The attacker runs OAuth in their browser and gets a *valid authorization code*
+2) The attacker forges the *profile linking request* from the victim’s browser,
+   sending their own code
+3) The attacker authenticates using OAuth and gets access to the *victim’s account*
+
+*** Countermeasure: State parameter
+The optional state parameter of OAuth can be used to mitigate CSRF.
+1) At the start of the run, the client generates a random state parameter
+2) The value of state is saved in the user’s session and shared with the service
+3) If the value of state at step 7 does not match the one in the session, the
+   run is aborted -> *The attacker’s state does not work in the victim’s session*
+
+*** Token stealing attacks
+Token stealing attacks may take different forms. A paradigmatic example is
+enabled by a lenient validation of the redirect URL implemented by the service,
+e.g., white-listing all the subdomains of a given client.
+1) The attacker starts the protocol from the victim’s browser, setting the
+   redirect URL at step 3 to https://evil.wordpress.com
+2) The attacker gets access to the victim’s code when it is sent to the redirect
+   URL at step 7
+3) The attacker sends the stolen code to blog.wordpress.com and authenticates as
+   Alice from their browser
+
+*** Mitigation: Strict Validation
+Token stealing attacks can be mitigated by performing strict validation of the
+redirect URL, i.e., perform exact matching of pre-registered URLs and it aborts
+the protocol in case of mismatch.
+
+*** Migitation: PKCE
+Proof Key for Code Exchange (PKCE) is an OAuth extension designed to mitigate
+the risks of stolen authorization codes.
+- Extension of the Authorization Code Grant that requires the client to generate
+  a random secret known as the *code verifier*, which is saved in the session;
+- A hash of the code verifier known as the *code challenge* is sent in the request
+  for the auth code and bound to the code at the service;
+- The client must provide the code verifier when exchanging the auth code for
+  the access token
+
+** OAuth security best practices
+- *Implement PKCE* as an effective countermeasure against some of the most
+  significant attacks against OAuth;
+- *Perform strict validation of the redirect URL*, using different URLs for
+  different services with explicit user intention tracking;
+- *Implement defenses against CSRF*, e.g., using one-time tokens bound to the user
+  agent in the *state parameter*
+- Do not use OAuth for SSO alone, but consider OpenID Connect
+- Limit the scope and the duration of access tokens
