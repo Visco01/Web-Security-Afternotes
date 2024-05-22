@@ -950,3 +950,64 @@ What happens if the GET parameter contains two user parameters?
   information you need
 - otherwise, manually parse the parameters and check that none of them occurs multiple times
 - encode the & characters to avoid the discussed attack
+
+* OAuth 2.0
+We would like to have a way for Internet users to grant websites or applications
+access to their information on other websites, but without giving them access to
+their passwords!
+
+#+begin_quote
+*OAuth*: The OAuth 2.0 authorization framework enables a third-party application
+ to obtain limited access to an HTTP service on behalf of a resource owner, by
+ orchestrating an approval interaction between the resource owner and the HTTP
+ service.
+#+end_quote
+
+** Entities
+- *Resource Owner*: the user who authorizes a client application to access their
+  account;
+- *Client Application*: the web app that wants to access the user’s account, which
+  is hosted at the resource server;
+- *Resource Server*: the web app that hosts the user’s account and the associated
+  resources;
+- *Authorization Server*: the web app that is in charge of verifying the user’s
+  identity and granting authorization.
+
+** OAuth flow
+1) Registration form on the service’s website, providing at least: *Client name*,
+   *Homepage URL*, *Redirect URL* / *Callback URL*
+2) Once the client is registered, the service will issue client credentials to it: *client identifier*, *client secret*
+3) the authorization grant type depends on the method used by the client to request authorization and on the grant types supported by the service
+4) After authenticating at the service, the user is prompted to authorize or
+   deny access to their account by the client
+5) If the user provides consent, the service redirects the browser to the
+   redirect URL which was specified during the client registration, along with
+   an *authorization code*
+6) The client requests an *access token* from the service, by passing the
+   *authorization code* along with *authentication credentials*, including the
+   client secret, to the API token endpoint
+7) If the authorization code is valid, the service will send a response with the
+   access token to the client. Now the client is authorized
+
+   The step of the Authorization Code grant may include an optional *refresh token*,
+   which allows the client to obtain a new authentication token without
+   involving the user again
+
+*** Implicit grant type
+The *implicit grant flow* is intended for use cases where the confidentiality of
+the client secret is hard to achieve. It basically works as follows: the user is
+asked to authorize the client, then the service passes the access token back to
+the user-agent, which passes it to the application.
+
+If the user provides consent, the service redirects the browser to the redirect
+URL along with the access token (no authorization code here).
+
+The *Implicit flow has no authorization code and the access token is sent* to
+the browser before passing it to the client. The Implicit flow does not
+authenticate the identity of the client and relies on the redirect URL to serve
+this purpose.
+
+#+begin_quote
+*Once the access token is leaked, e.g., via XSS, the attacker can operate under
+ the user’s identity until the token expires*!
+#+end_quote
